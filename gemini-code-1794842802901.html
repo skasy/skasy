@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Onward VR Overlay</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@600;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1920px;
+    height: 1080px;
+    background: transparent;
+    overflow: hidden;
+    font-family: 'Chakra Petch', sans-serif;
+    color: #ffffff;
+    user-select: none;
+  }
+
+  /* CONTENEDOR PRINCIPAL INFERIOR */
+  .hud-wrapper {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1840px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .hud-wrapper.hidden { opacity: 0; transform: translate(-50%, 40px); pointer-events: none; }
+
+  /* FILA SUPERIOR: 5 CASILLAS DE MAPAS Y VETOS */
+  .maps-row {
+    display: grid;
+    grid-template-columns: 310px 1fr 1fr 1fr 310px;
+    gap: 10px;
+    height: 112px;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  .maps-row.hidden { opacity: 0; transform: translateY(20px); pointer-events: none; }
+
+  /* BLOQUES DE VETOS (IZQUIERDA Y DERECHA) */
+  .bans-box {
+    background: rgba(12, 16, 14, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    flex-direction: column;
+    padding: 4px 6px;
+    position: relative;
+  }
+  .bans-header {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #e5534b;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .bans-box.right .bans-header { flex-direction: row-reverse; }
+
+  .bans-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+  .ban-item {
+    position: relative;
+    flex: 1;
+    background-size: cover;
+    background-position: center;
+    background-color: #1a201c;
+    border: 1px solid rgba(229, 83, 75, 0.45);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    overflow: hidden;
+  }
+  .bans-box.right .ban-item { justify-content: flex-end; }
+  .ban-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(10,12,11,0.85) 0%, rgba(10,12,11,0.45) 100%);
+  }
+  .bans-box.right .ban-item::before {
+    background: linear-gradient(270deg, rgba(10,12,11,0.85) 0%, rgba(10,12,11,0.45) 100%);
+  }
+  /* RAYA DIAGONAL ROJA DE VETO */
+  .ban-item::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -5%;
+    width: 110%;
+    height: 3px;
+    background: #ff2a2a;
+    box-shadow: 0 0 8px rgba(255, 42, 42, 0.9);
+    transform: rotate(-11deg);
+    z-index: 3;
+  }
+  .bans-box.right .ban-item::after {
+    transform: rotate(11deg);
+  }
+  .ban-name {
+    position: relative;
+    z-index: 2;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #d0d7d3;
+    text-shadow: 0 2px 4px #000;
+  }
+
+  /* CASILLAS CENTRALES (MAPAS 1, 2 Y 3) */
+  .map-card {
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    background-color: #141916;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px 14px;
+    overflow: hidden;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .map-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10,14,12,0.75) 0%, rgba(10,14,12,0.35) 50%, rgba(10,14,12,0.9) 100%);
+  }
+  .map-card.live {
+    border-color: #57e32c;
+    box-shadow: 0 0 18px rgba(87, 227, 44, 0.35), inset 0 0 12px rgba(87, 227, 44, 0.2);
+  }
+  .map-card-top, .map-card-bottom {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .map-slot-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #9fb0a6;
+    letter-spacing: 1.5px;
+  }
+  .map-status {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 2px 8px;
+    letter-spacing: 1px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #b0beb6;
+  }
+  .map-card.live .map-status {
+    background: rgba(180, 20, 20, 0.9);
+    border-color: #ff4d4d;
+    color: #fff;
+  }
+  .map-card.live .map-status::before {
+    content: "● ";
+    color: #ff8080;
+  }
+  .map-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+  }
+  .map-score-badge {
+    font-size: 22px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 2px 10px;
+    border-left: 3px solid #57e32c;
+  }
+
+  /* FILA INFERIOR: MARCADOR PRINCIPAL */
+  .scoreboard-bar {
+    position: relative;
+    height: 126px;
+    background-size: cover;
+    background-position: center;
+    background-color: #111613;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: grid;
+    grid-template-columns: 1fr 540px 1fr;
+    align-items: center;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.75);
+  }
+  .scoreboard-bar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(12,16,14,0.92) 0%, rgba(12,16,14,0.72) 50%, rgba(12,16,14,0.92) 100%);
+  }
+
+  /* BLOQUES DE EQUIPO (IZQUIERDA Y DERECHA) */
+  .team-section {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 32px;
+    height: 100%;
+  }
+  .team-section.right {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+  .team-logo {
+    width: 86px;
+    height: 86px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
+  }
+  .team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .team-tag {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  .team-full-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #a9b8af;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .team-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .team-section.right .team-meta {
+    flex-direction: row-reverse;
+  }
+
+  /* BADGE ATACANTE / DEFENSOR */
+  .side-badge {
+    font-size: 15px;
+    font-weight: 800;
+    padding: 2px 10px;
+    letter-spacing: 1.5px;
+    border: 1px solid;
+  }
+  .side-badge.atk {
+    background: rgba(87, 227, 44, 0.2);
+    border-color: #57e32c;
+    color: #7dff54;
+  }
+  .side-badge.def {
+    background: rgba(235, 168, 52, 0.2);
+    border-color: #eba834;
+    color: #ffc55c;
+  }
+  .faction-name {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #c5d1ca;
+  }
+
+  /* ROMBOS DE MARCADOR GLOBAL DE SERIES (BO3) */
+  .series-diamonds {
+    display: flex;
+    gap: 8px;
+    margin-left: 6px;
+  }
+  .team-section.right .series-diamonds {
+    margin-left: 0;
+    margin-right: 6px;
+  }
+  .diamond {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #8fa397;
+    transform: rotate(45deg);
+    transition: all 0.3s ease;
+  }
+  .diamond.won {
+    background: #57e32c;
+    border-color: #57e32c;
+    box-shadow: 0 0 10px #57e32c;
+  }
+
+  /* CENTRO DEL MARCADOR: RONDAS Y DATOS DEL EVENTO */
+  .center-score-area {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    height: 100%;
+  }
+  .score-box {
+    width: 96px;
+    height: 96px;
+    background: rgba(15, 22, 18, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 62px;
+    font-weight: 700;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+  }
+  .score-box.atk-border { border-color: #57e32c; color: #ffffff; }
+  .score-box.def-border { border-color: #eba834; color: #ffffff; }
+
+  .match-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-width: 270px;
+  }
+  .event-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #97d94c;
+    text-transform: uppercase;
+  }
+  .current-map-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    line-height: 1.1;
+    margin: 2px 0;
+  }
+  .round-subtitle {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #cbd6cf;
+  }
+  .series-total-text {
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    background: rgba(255,255,255,0.1);
+    padding: 1px 12px;
+    letter-spacing: 2px;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div class="hud-wrapper" id="hudWrapper">
+  <!-- FILA SUPERIOR: 5 BLOQUES DE MAPAS -->
+  <div class="maps-row" id="mapsRow">
+    <!-- Casilla 1: Vetos Equipo A -->
+    <div class="bans-box left">
+      <div class="bans-header"><span id="banTagA">TEAM A BANS</span><span>✕</span></div>
+      <div class="bans-list">
+        <div class="ban-item" id="banA1Img"><span class="ban-name" id="banA1Name">MAPA 1</span></div>
+        <div class="ban-item" id="banA2Img"><span class="ban-name" id="banA2Name">MAPA 2</span></div>
+      </div>
+    </div>
+
+    <!-- Casilla 2: Mapa 1 -->
+    <div class="map-card" id="cardMap1">
+      <div class="map-card-top">
+        <span class="map-slot-label">MAP 1</span>
+        <span class="map-status" id="statusMap1">NEXT</span>
+      </div>
+      <div class="map-card-bottom">
+        <span class="map-title" id="nameMap1">TBD</span>
+        <span class="map-score-badge" id="scoreMap1" style="display:none;">0-0</span>
+      </div>
+    </div>
+
+    <!-- Casilla 3: Mapa 2 -->
+    <div class="map-card" id="cardMap2">
+      <div class="map-card-top">
+        <span class="map-slot-label">MAP 2</span>
+        <span class="map-status" id="statusMap2">NEXT</span>
+      </div>
+      <div class="map-card-bottom">
+        <span class="map-title" id="nameMap2">TBD</span>
+        <span class="map-score-badge" id="scoreMap2" style="display:none;">0-0</span>
+      </div>
+    </div>
+
+    <!-- Casilla 4: Mapa 3 (Decider) -->
+    <div class="map-card" id="cardMap3">
+      <div class="map-card-top">
+        <span class="map-slot-label">MAP 3 • DECIDER</span>
+        <span class="map-status" id="statusMap3">NEXT</span>
+      </div>
+      <div class="map-card-bottom">
+        <span class="map-title" id="nameMap3">TBD</span>
+        <span class="map-score-badge" id="scoreMap3" style="display:none;">0-0</span>
+      </div>
+    </div>
+
+    <!-- Casilla 5: Vetos Equipo B -->
+    <div class="bans-box right">
+      <div class="bans-header"><span id="banTagB">TEAM B BANS</span><span>✕</span></div>
+      <div class="bans-list">
+        <div class="ban-item" id="banB1Img"><span class="ban-name" id="banB1Name">MAPA 1</span></div>
+        <div class="ban-item" id="banB2Img"><span class="ban-name" id="banB2Name">MAPA 2</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILA INFERIOR: MARCADOR PRINCIPAL -->
+  <div class="scoreboard-bar" id="scoreboardBg">
+    <!-- Equipo A -->
+    <div class="team-section left">
+      <img src="" alt="" class="team-logo" id="logoA" onerror="this.style.opacity='0'">
+      <div class="team-info">
+        <div class="team-tag" id="tagA">TMA</div>
+        <div class="team-full-name" id="nameA">TEAM ALPHA</div>
+        <div class="team-meta">
+          <span class="side-badge def" id="sideA">DEF</span>
+          <span class="faction-name" id="factionA">MARSOC</span>
+          <div class="series-diamonds">
+            <div class="diamond" id="diaA1"></div>
+            <div class="diamond" id="diaA2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Centro -->
+    <div class="center-score-area">
+      <div class="score-box def-border" id="scoreBoxA">0</div>
+      <div class="match-details">
+        <div class="event-title" id="eventTitle">ONWARD VR • COMPETITIVE</div>
+        <div class="current-map-title" id="activeMapName">CARGO</div>
+        <div class="round-subtitle" id="roundSubtitle">MAP 1 OF 3 • ROUND 1</div>
+        <div class="series-total-text" id="seriesTotalText">GLOBAL: 0 - 0</div>
+      </div>
+      <div class="score-box atk-border" id="scoreBoxB">0</div>
+    </div>
+
+    <!-- Equipo B -->
+    <div class="team-section right">
+      <img src="" alt="" class="team-logo" id="logoB" onerror="this.style.opacity='0'">
+      <div class="team-info">
+        <div class="team-tag" id="tagB">TMB</div>
+        <div class="team-full-name" id="nameB">TEAM BRAVO</div>
+        <div class="team-meta">
+          <span class="side-badge atk" id="sideB">ATK</span>
+          <span class="faction-name" id="factionB">VOLK</span>
+          <div class="series-diamonds">
+            <div class="diamond" id="diaB1"></div>
+            <div class="diamond" id="diaB2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+  function getMapUrl(mapName) {
+    const found = CONFIG.mapas.find(m => m.nombre === mapName);
+    return found ? `url('${CONFIG.rutaMapas}${found.archivo}')` : 'none';
+  }
+
+  function applyState(state) {
+    if (!state) return;
+
+    // Visibilidad
+    document.getElementById('hudWrapper').classList.toggle('hidden', !state.showHud);
+    document.getElementById('mapsRow').classList.toggle('hidden', !state.showMaps);
+
+    // Equipo A
+    document.getElementById('tagA').textContent = state.teamA.tag;
+    document.getElementById('nameA').textContent = state.teamA.name;
+    document.getElementById('banTagA').textContent = `${state.teamA.tag} BANS`;
+    const logoA = document.getElementById('logoA');
+    logoA.src = CONFIG.rutaEscudos + state.teamA.logo;
+    logoA.style.opacity = state.teamA.logo ? '1' : '0';
+
+    const sideAEl = document.getElementById('sideA');
+    sideAEl.textContent = state.teamA.side;
+    sideAEl.className = 'side-badge ' + (state.teamA.side === 'ATK' ? 'atk' : 'def');
+    document.getElementById('factionA').textContent = state.teamA.side === 'ATK' ? 'VOLK' : 'MARSOC';
+    document.getElementById('scoreBoxA').textContent = state.teamA.score;
+    document.getElementById('scoreBoxA').className = 'score-box ' + (state.teamA.side === 'ATK' ? 'atk-border' : 'def-border');
+
+    // Equipo B
+    document.getElementById('tagB').textContent = state.teamB.tag;
+    document.getElementById('nameB').textContent = state.teamB.name;
+    document.getElementById('banTagB').textContent = `${state.teamB.tag} BANS`;
+    const logoB = document.getElementById('logoB');
+    logoB.src = CONFIG.rutaEscudos + state.teamB.logo;
+    logoB.style.opacity = state.teamB.logo ? '1' : '0';
+
+    const sideBEl = document.getElementById('sideB');
+    sideBEl.textContent = state.teamB.side;
+    sideBEl.className = 'side-badge ' + (state.teamB.side === 'ATK' ? 'atk' : 'def');
+    document.getElementById('factionB').textContent = state.teamB.side === 'ATK' ? 'VOLK' : 'MARSOC';
+    document.getElementById('scoreBoxB').textContent = state.teamB.score;
+    document.getElementById('scoreBoxB').className = 'score-box ' + (state.teamB.side === 'ATK' ? 'atk-border' : 'def-border');
+
+    // Rombos de serie global (BO3)
+    document.getElementById('diaA1').classList.toggle('won', state.teamA.mapsWon >= 1);
+    document.getElementById('diaA2').classList.toggle('won', state.teamA.mapsWon >= 2);
+    document.getElementById('diaB1').classList.toggle('won', state.teamB.mapsWon >= 1);
+    document.getElementById('diaB2').classList.toggle('won', state.teamB.mapsWon >= 2);
+    document.getElementById('seriesTotalText').textContent = `GLOBAL: ${state.teamA.mapsWon} - ${state.teamB.mapsWon}`;
+
+    // Centro y Fondo del Marcador
+    document.getElementById('eventTitle').textContent = state.eventTitle;
+    const activeMapObj = state.maps[state.activeMapIndex];
+    document.getElementById('activeMapName').textContent = activeMapObj.name;
+    document.getElementById('scoreboardBg').style.backgroundImage = getMapUrl(activeMapObj.name);
+    const currentRound = Number(state.teamA.score) + Number(state.teamB.score) + 1;
+    document.getElementById('roundSubtitle').textContent = `MAP ${state.activeMapIndex + 1} OF 3 • ROUND ${currentRound}`;
+
+    // Vetos (Bans)
+    document.getElementById('banA1Name').textContent = state.bansA[0];
+    document.getElementById('banA1Img').style.backgroundImage = getMapUrl(state.bansA[0]);
+    document.getElementById('banA2Name').textContent = state.bansA[1];
+    document.getElementById('banA2Img').style.backgroundImage = getMapUrl(state.bansA[1]);
+
+    document.getElementById('banB1Name').textContent = state.bansB[0];
+    document.getElementById('banB1Img').style.backgroundImage = getMapUrl(state.bansB[0]);
+    document.getElementById('banB2Name').textContent = state.bansB[1];
+    document.getElementById('banB2Img').style.backgroundImage = getMapUrl(state.bansB[1]);
+
+    // 3 Mapas a jugar
+    [0, 1, 2].forEach(idx => {
+      const m = state.maps[idx];
+      const num = idx + 1;
+      const card = document.getElementById(`cardMap${num}`);
+      const statusEl = document.getElementById(`statusMap${num}`);
+      const scoreEl = document.getElementById(`scoreMap${num}`);
+
+      document.getElementById(`nameMap${num}`).textContent = m.name;
+      card.style.backgroundImage = getMapUrl(m.name);
+
+      card.classList.toggle('live', state.activeMapIndex === idx && m.status === 'LIVE');
+      statusEl.textContent = m.status;
+
+      if (m.status === 'LIVE') {
+        scoreEl.style.display = 'inline-block';
+        scoreEl.textContent = `${state.teamA.score}-${state.teamB.score}`;
+      } else if (m.status === 'FINAL' && m.finalScore) {
+        scoreEl.style.display = 'inline-block';
+        scoreEl.textContent = m.finalScore;
+      } else {
+        scoreEl.style.display = 'none';
+      }
+    });
+  }
+
+  // Escucha cambios en tiempo real desde el panel de control
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'onward_overlay_state') {
+      applyState(JSON.parse(e.newValue));
+    }
+  });
+
+  // Carga inicial
+  const saved = localStorage.getItem('onward_overlay_state');
+  if (saved) applyState(JSON.parse(saved));
+</script>
+</body>
+</html>

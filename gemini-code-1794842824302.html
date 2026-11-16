@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Panel Control - Onward VR Overlay</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  body { background: #121518; color: #e6edf3; margin: 0; padding: 20px; }
+  h1 { font-size: 20px; margin: 0 0 16px; color: #57e32c; display: flex; justify-content: space-between; align-items: center; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card { background: #1c2128; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+  .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin: 0 0 12px; border-bottom: 1px solid #30363d; padding-bottom: 6px; }
+  label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; margin-top: 8px; }
+  input, select { width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 4px; font-size: 14px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  button { cursor: pointer; border: none; border-radius: 5px; padding: 9px 14px; font-weight: 700; font-size: 13px; transition: 0.15s; }
+  .btn-green { background: #2ea043; color: #fff; }
+  .btn-green:hover { background: #3fb950; }
+  .btn-red { background: #da3633; color: #fff; }
+  .btn-blue { background: #1f6feb; color: #fff; }
+  .btn-gray { background: #30363d; color: #e6edf3; }
+  .btn-gray:hover { background: #484f58; }
+  .score-controls { display: flex; align-items: center; justify-content: space-between; background: #0d1117; padding: 10px; border-radius: 6px; margin-top: 10px; }
+  .score-num { font-size: 32px; font-weight: 800; color: #57e32c; min-width: 45px; text-align: center; }
+  .toggle-bar { display: flex; gap: 10px; background: #1c2128; padding: 12px 16px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<h1>
+  <span>🎮 CONTROL DE RETRANSMISIÓN - ONWARD VR</span>
+  <span style="font-size:12px; color:#8b949e;">URL para OBS: <b>http://localhost:8080/overlay.html</b></span>
+</h1>
+
+<!-- BARRA SUPERIOR DE VISIBILIDAD Y ACCIONES RÁPIDAS -->
+<div class="toggle-bar">
+  <button class="btn-green" id="btnToggleHud" onclick="toggleBool('showHud')">👁️ HUD COMPLETO: VISIBLE</button>
+  <button class="btn-green" id="btnToggleMaps" onclick="toggleBool('showMaps')">🗺️ BARRA MAPAS/VETOS: VISIBLE</button>
+  <button class="btn-blue" onclick="swapSides()">⇄ CAMBIAR BANDOS (ATK / DEF)</button>
+  <button class="btn-gray" onclick="resetRoundScores()">↺ REINICIAR RONDAS (0-0)</button>
+  <div style="flex:1; min-width: 220px;">
+    <input type="text" id="eventTitle" placeholder="Título Evento (ej. VRML • WEEK 4)" oninput="updateState()">
+  </div>
+</div>
+
+<!-- EQUIPOS A Y B -->
+<div class="grid-2">
+  <!-- EQUIPO A -->
+  <div class="card">
+    <h2>🛡️ Equipo Izquierda (Team A)</h2>
+    <div class="grid-2" style="margin-bottom:0;">
+      <div>
+        <label>Tag (3-4 letras)</label>
+        <input type="text" id="tagA" maxlength="5" oninput="updateState()">
+      </div>
+      <div>
+        <label>Escudo (Archivo en /escudos/)</label>
+        <select id="logoA" onchange="updateState()"></select>
+      </div>
+    </div>
+    <label>Nombre Completo</label>
+    <input type="text" id="nameA" oninput="updateState()">
+
+    <div class="grid-2" style="margin-bottom:0;">
+      <div>
+        <label>Bando Actual</label>
+        <select id="sideA" onchange="syncSide('A')">
+          <option value="DEF">DEF (Defensor - MARSOC)</option>
+          <option value="ATK">ATK (Atacante - VOLK)</option>
+        </select>
+      </div>
+      <div>
+        <label>Mapas Ganados (Global BO3)</label>
+        <select id="mapsWonA" onchange="updateState()">
+          <option value="0">0 Mapas</option>
+          <option value="1">1 Mapa</option>
+          <option value="2">2 Mapas (Ganador Serie)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="score-controls">
+      <span>RONDAS MAPA ACTUAL:</span>
+      <div class="row">
+        <button class="btn-red" onclick="changeScore('A', -1)">-1</button>
+        <span class="score-num" id="scoreDisplayA">0</span>
+        <button class="btn-green" onclick="changeScore('A', 1)">+1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EQUIPO B -->
+  <div class="card">
+    <h2>⚔️ Equipo Derecha (Team B)</h2>
+    <div class="grid-2" style="margin-bottom:0;">
+      <div>
+        <label>Tag (3-4 letras)</label>
+        <input type="text" id="tagB" maxlength="5" oninput="updateState()">
+      </div>
+      <div>
+        <label>Escudo (Archivo en /escudos/)</label>
+        <select id="logoB" onchange="updateState()"></select>
+      </div>
+    </div>
+    <label>Nombre Completo</label>
+    <input type="text" id="nameB" oninput="updateState()">
+
+    <div class="grid-2" style="margin-bottom:0;">
+      <div>
+        <label>Bando Actual</label>
+        <select id="sideB" onchange="syncSide('B')">
+          <option value="ATK">ATK (Atacante - VOLK)</option>
+          <option value="DEF">DEF (Defensor - MARSOC)</option>
+        </select>
+      </div>
+      <div>
+        <label>Mapas Ganados (Global BO3)</label>
+        <select id="mapsWonB" onchange="updateState()">
+          <option value="0">0 Mapas</option>
+          <option value="1">1 Mapa</option>
+          <option value="2">2 Mapas (Ganador Serie)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="score-controls">
+      <span>RONDAS MAPA ACTUAL:</span>
+      <div class="row">
+        <button class="btn-red" onclick="changeScore('B', -1)">-1</button>
+        <span class="score-num" id="scoreDisplayB">0</span>
+        <button class="btn-green" onclick="changeScore('B', 1)">+1</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAPAS Y VETOS (5 CASILLAS) -->
+<div class="grid-3">
+  <!-- VETOS EQUIPO A -->
+  <div class="card">
+    <h2>🚫 Vetos Equipo A (Casilla 1)</h2>
+    <label>1/2 Superior (1er Veto)</label>
+    <select id="banA1" class="map-select" onchange="updateState()"></select>
+    <label>1/2 Inferior (2º Veto)</label>
+    <select id="banA2" class="map-select" onchange="updateState()"></select>
+  </div>
+
+  <!-- MAPAS A JUGAR -->
+  <div class="card">
+    <h2>🗺️ Mapas a Jugar (Casillas 2, 3 y 4)</h2>
+    <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #30363d;">
+      <div class="row">
+        <strong style="min-width:60px;">MAPA 1:</strong>
+        <select id="map1Name" class="map-select" onchange="updateState()"></select>
+        <select id="map1Status" onchange="setMapStatus(0)" style="width:110px;">
+          <option value="LIVE">LIVE</option>
+          <option value="NEXT">NEXT</option>
+          <option value="FINAL">FINAL</option>
+        </select>
+        <input type="text" id="map1Final" placeholder="Ej: 5-3" style="width:75px;" oninput="updateState()">
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #30363d;">
+      <div class="row">
+        <strong style="min-width:60px;">MAPA 2:</strong>
+        <select id="map2Name" class="map-select" onchange="updateState()"></select>
+        <select id="map2Status" onchange="setMapStatus(1)" style="width:110px;">
+          <option value="NEXT">NEXT</option>
+          <option value="LIVE">LIVE</option>
+          <option value="FINAL">FINAL</option>
+        </select>
+        <input type="text" id="map2Final" placeholder="Ej: 4-5" style="width:75px;" oninput="updateState()">
+      </div>
+    </div>
+
+    <div>
+      <div class="row">
+        <strong style="min-width:60px;">MAPA 3:</strong>
+        <select id="map3Name" class="map-select" onchange="updateState()"></select>
+        <select id="map3Status" onchange="setMapStatus(2)" style="width:110px;">
+          <option value="NEXT">NEXT</option>
+          <option value="LIVE">LIVE</option>
+          <option value="FINAL">FINAL</option>
+        </select>
+        <input type="text" id="map3Final" placeholder="Ej: 5-2" style="width:75px;" oninput="updateState()">
+      </div>
+    </div>
+  </div>
+
+  <!-- VETOS EQUIPO B -->
+  <div class="card">
+    <h2>🚫 Vetos Equipo B (Casilla 5)</h2>
+    <label>1/2 Superior (1er Veto)</label>
+    <select id="banB1" class="map-select" onchange="updateState()"></select>
+    <label>1/2 Inferior (2º Veto)</label>
+    <select id="banB2" class="map-select" onchange="updateState()"></select>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+  let state = JSON.parse(localStorage.getItem('onward_overlay_state')) || {
+    showHud: true,
+    showMaps: true,
+    eventTitle: "ONWARD VR • MATCH DAY",
+    activeMapIndex: 0,
+    teamA: { tag: "MNC", name: "MANCOS VR", logo: "alpha.png", side: "DEF", score: 0, mapsWon: 0 },
+    teamB: { tag: "RIV", name: "RIVAL SQUAD", logo: "bravo.png", side: "ATK", score: 0, mapsWon: 0 },
+    bansA: ["USS QUEST", "QUARANTINE"],
+    bansB: ["SHIPYARD", "ARCTIC"],
+    maps: [
+      { name: "CARGO", status: "LIVE", finalScore: "" },
+      { name: "DOWNFALL", status: "NEXT", finalScore: "" },
+      { name: "SUBURBIA", status: "NEXT", finalScore: "" }
+    ]
+  };
+
+  // Rellenar desplegables desde config.js
+  function initDropdowns() {
+    document.querySelectorAll('.map-select').forEach(sel => {
+      sel.innerHTML = CONFIG.mapas.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join('');
+    });
+    ['logoA', 'logoB'].forEach(id => {
+      document.getElementById(id).innerHTML = CONFIG.escudos.map(e => `<option value="${e.archivo}">${e.nombre} (${e.archivo})</option>`).join('');
+    });
+  }
+
+  function loadFormFromState() {
+    document.getElementById('eventTitle').value = state.eventTitle;
+    document.getElementById('tagA').value = state.teamA.tag;
+    document.getElementById('nameA').value = state.teamA.name;
+    document.getElementById('logoA').value = state.teamA.logo;
+    document.getElementById('sideA').value = state.teamA.side;
+    document.getElementById('mapsWonA').value = state.teamA.mapsWon;
+    document.getElementById('scoreDisplayA').textContent = state.teamA.score;
+
+    document.getElementById('tagB').value = state.teamB.tag;
+    document.getElementById('nameB').value = state.teamB.name;
+    document.getElementById('logoB').value = state.teamB.logo;
+    document.getElementById('sideB').value = state.teamB.side;
+    document.getElementById('mapsWonB').value = state.teamB.mapsWon;
+    document.getElementById('scoreDisplayB').textContent = state.teamB.score;
+
+    document.getElementById('banA1').value = state.bansA[0];
+    document.getElementById('banA2').value = state.bansA[1];
+    document.getElementById('banB1').value = state.bansB[0];
+    document.getElementById('banB2').value = state.bansB[1];
+
+    [0, 1, 2].forEach(i => {
+      document.getElementById(`map${i+1}Name`).value = state.maps[i].name;
+      document.getElementById(`map${i+1}Status`).value = state.maps[i].status;
+      document.getElementById(`map${i+1}Final`).value = state.maps[i].finalScore;
+    });
+
+    updateToggleButtons();
+  }
+
+  function updateState() {
+    state.eventTitle = document.getElementById('eventTitle').value;
+    state.teamA.tag = document.getElementById('tagA').value.toUpperCase();
+    state.teamA.name = document.getElementById('nameA').value;
+    state.teamA.logo = document.getElementById('logoA').value;
+    state.teamA.side = document.getElementById('sideA').value;
+    state.teamA.mapsWon = parseInt(document.getElementById('mapsWonA').value);
+
+    state.teamB.tag = document.getElementById('tagB').value.toUpperCase();
+    state.teamB.name = document.getElementById('nameB').value;
+    state.teamB.logo = document.getElementById('logoB').value;
+    state.teamB.side = document.getElementById('sideB').value;
+    state.teamB.mapsWon = parseInt(document.getElementById('mapsWonB').value);
+
+    state.bansA = [document.getElementById('banA1').value, document.getElementById('banA2').value];
+    state.bansB = [document.getElementById('banB1').value, document.getElementById('banB2').value];
+
+    [0, 1, 2].forEach(i => {
+      state.maps[i].name = document.getElementById(`map${i+1}Name`).value;
+      state.maps[i].status = document.getElementById(`map${i+1}Status`).value;
+      state.maps[i].finalScore = document.getElementById(`map${i+1}Final`).value;
+      if (state.maps[i].status === 'LIVE') state.activeMapIndex = i;
+    });
+
+    save();
+  }
+
+  function save() {
+    localStorage.setItem('onward_overlay_state', JSON.stringify(state));
+  }
+
+  function changeScore(team, delta) {
+    if (team === 'A') {
+      state.teamA.score = Math.max(0, Math.min(5, state.teamA.score + delta));
+      document.getElementById('scoreDisplayA').textContent = state.teamA.score;
+    } else {
+      state.teamB.score = Math.max(0, Math.min(5, state.teamB.score + delta));
+      document.getElementById('scoreDisplayB').textContent = state.teamB.score;
+    }
+    save();
+  }
+
+  function resetRoundScores() {
+    state.teamA.score = 0;
+    state.teamB.score = 0;
+    document.getElementById('scoreDisplayA').textContent = 0;
+    document.getElementById('scoreDisplayB').textContent = 0;
+    save();
+  }
+
+  function syncSide(changed) {
+    const val = document.getElementById('side' + changed).value;
+    const other = changed === 'A' ? 'B' : 'A';
+    document.getElementById('side' + other).value = val === 'ATK' ? 'DEF' : 'ATK';
+    updateState();
+  }
+
+  function swapSides() {
+    const currentA = document.getElementById('sideA').value;
+    document.getElementById('sideA').value = currentA === 'ATK' ? 'DEF' : 'ATK';
+    syncSide('A');
+  }
+
+  function setMapStatus(idx) {
+    const newStatus = document.getElementById(`map${idx+1}Status`).value;
+    if (newStatus === 'LIVE') {
+      state.activeMapIndex = idx;
+      [0, 1, 2].forEach(i => {
+        if (i !== idx && document.getElementById(`map${i+1}Status`).value === 'LIVE') {
+          document.getElementById(`map${i+1}Status`).value = 'NEXT';
+        }
+      });
+    }
+    updateState();
+  }
+
+  function toggleBool(key) {
+    state[key] = !state[key];
+    updateToggleButtons();
+    save();
+  }
+
+  function updateToggleButtons() {
+    const btnHud = document.getElementById('btnToggleHud');
+    btnHud.textContent = state.showHud ? '👁️ HUD COMPLETO: VISIBLE' : '🚫 HUD COMPLETO: OCULTO';
+    btnHud.className = state.showHud ? 'btn-green' : 'btn-red';
+
+    const btnMaps = document.getElementById('btnToggleMaps');
+    btnMaps.textContent = state.showMaps ? '🗺️ BARRA MAPAS/VETOS: VISIBLE' : '🚫 BARRA MAPAS/VETOS: OCULTA';
+    btnMaps.className = state.showMaps ? 'btn-green' : 'btn-red';
+  }
+
+  initDropdowns();
+  loadFormFromState();
+  save();
+</script>
+</body>
+</html>
